@@ -1,0 +1,120 @@
+version: '3'
+
+services:
+  # Serviço do banco de dados MySQL
+  mysql:
+    image: mysql
+    restart: always
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql:/var/lib/mysql
+  #  command: --init-file /docker-entrypoint-initdb.d/init.sql
+
+  # Serviço de inicialização do banco de dados
+  db_init:
+    image: mysql:latest
+    depends_on:
+      - mysql
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: [ "bash", "-c", "sleep 10 && mysql -hmysql -uroot -pexample < /docker-entrypoint-initdb.d/init.sql" ]
+
+
+
+
+  # Serviço da aplicação Node.js
+  customer:
+    build:
+      context: ../tech-challenge-fast-food-system-customer
+      dockerfile: Dockerfile
+    container_name: customer_app
+    working_dir: /usr/src/app
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASS=example
+      - DB_NAME=customer
+      - DB_PORT=3306
+    volumes:
+      - ./app:/usr/src/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db_init
+    command: npm start
+
+  # Serviço da aplicação Node.js
+  order:
+    build:
+      context: ../tech-challenge-fast-food-system-order
+      dockerfile: Dockerfile
+    container_name: order_app
+    working_dir: /usr/src/app
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASS=example
+      - DB_NAME=orders
+      - DB_PORT=3306
+    volumes:
+      - ./app:/usr/src/app
+    ports:
+      - "3001:3000"
+    depends_on:
+      - db_init
+    command: npm start
+
+  # Serviço da aplicação Node.js
+  payment:
+    build:
+      context: ../tech-challenge-fast-food-system-payment
+      dockerfile: Dockerfile
+    container_name: payment_app
+    working_dir: /usr/src/app
+    environment:
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASS=example
+      - DB_NAME=payment
+      - DB_PORT=3306
+    volumes:
+      - ./app:/usr/src/app
+    ports:
+      - "3002:3000"
+    depends_on:
+      - db_init
+    command: npm start
+
+  mongo:
+    image: mongo
+    container_name: mongo_db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongodb:/data/db
+
+  # Serviço da aplicação Node.js
+  preparation:
+    build:
+      context: ../tech-challenge-fast-food-system-preparation
+      dockerfile: Dockerfile
+    container_name: preparation_app
+    environment:
+      - spring.data.mongodb.uri=mongodb://admin:admin@mongo:27017
+    volumes:
+      - ./app_preparation:/usr/src/app
+    ports:
+      - "3003:8080"
+    depends_on:
+      - db_init
+
